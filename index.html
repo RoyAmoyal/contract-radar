@@ -1,0 +1,624 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="robots" content="noindex"></head><body><title>Contract Radar</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap">
+<style>
+/* Layout: sticky control bar over a responsive grid of player cards; a side sheet holds one player's full scouting file. Navy + peach echo the "From Scout to Agent" deck. */
+:root {
+  --bg: #0b1440; --surface: #121d50; --surface-2: #1a275f; --line: #283778;
+  --fg: #f3f1ec; --muted: #a7b0d4; --accent: #ffa36c; --accent-ink: #231103;
+  --good: #6fd3a1; --warn: #ffd166; --bad: #ff8a7a; --shadow: 0 10px 30px rgba(0,0,0,.35);
+  --font-display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
+  --font-body: "Barlow", "Segoe UI", system-ui, -apple-system, sans-serif;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) {
+  --bg: #f3f4f9; --surface: #ffffff; --surface-2: #eaedf6; --line: #d3d8ea;
+  --fg: #0b1440; --muted: #56618c; --accent: #d9622a; --accent-ink: #ffffff;
+  --good: #1d8a58; --warn: #a77a06; --bad: #c3412f; --shadow: 0 10px 30px rgba(11,20,64,.12);
+  color-scheme: light; } }
+:root[data-theme="light"] {
+  --bg: #f3f4f9; --surface: #ffffff; --surface-2: #eaedf6; --line: #d3d8ea;
+  --fg: #0b1440; --muted: #56618c; --accent: #d9622a; --accent-ink: #ffffff;
+  --good: #1d8a58; --warn: #a77a06; --bad: #c3412f; --shadow: 0 10px 30px rgba(11,20,64,.12);
+  color-scheme: light; }
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+img { max-width: 100%; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.45 var(--font-body); }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 30; background: var(--bg); }
+.wrap { max-width: 1320px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; letter-spacing: .01em; }
+button, select, input, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.num { font-variant-numeric: tabular-nums; }
+
+/* header */
+header.top { padding-block: 22px 14px; display: grid; gap: 14px; }
+.title-row { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px 24px; }
+h1 { font-size: clamp(30px, 5vw, 44px); font-weight: 700; line-height: 1; text-transform: uppercase; }
+h1 em { font-style: normal; color: var(--accent); }
+.lede { color: var(--muted); max-width: 70ch; margin: 6px 0 0; }
+.stats { display: flex; flex-wrap: wrap; gap: 8px 22px; }
+.stat b { display: block; font: 700 28px/1 var(--font-display); }
+.stat span { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+
+/* control bar */
+.controls { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: var(--bg); border-bottom: 1px solid var(--line); padding-block: 10px; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.row + .row { margin-top: 8px; }
+.field { display: flex; align-items: center; gap: 6px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 0 10px; min-height: 36px; }
+.field label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .05em; white-space: nowrap; }
+.field select, .field input { background: transparent; border: 0; min-height: 34px; outline: none; max-width: 100%; }
+.field select option { background: var(--surface); color: var(--fg); }
+.search { flex: 1 1 220px; min-width: 0; }
+.search input { width: 100%; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip-btn { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 5px 11px; font-size: 13px; font-weight: 600; cursor: pointer; }
+.chip-btn[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.chip-btn:hover { border-color: var(--accent); }
+.sep { width: 1px; height: 24px; background: var(--line); margin-inline: 2px; }
+.toggle { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.toggle button { background: var(--surface); border: 0; padding: 7px 12px; cursor: pointer; font-weight: 600; font-size: 13px; }
+.toggle button[aria-pressed="true"] { background: var(--surface-2); color: var(--accent); }
+.ghost { background: none; border: 1px solid var(--line); border-radius: 8px; padding: 7px 12px; cursor: pointer; font-weight: 600; font-size: 13px; }
+.ghost:hover { border-color: var(--accent); }
+
+/* window tabs */
+.wintabs { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; margin-bottom: 10px; }
+.wtab { text-align: left; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; cursor: pointer; display: grid; gap: 1px; min-width: 0; }
+.wtab b { font: 700 18px/1.1 var(--font-display); text-transform: uppercase; letter-spacing: .02em; }
+.wtab span { font-size: 12.5px; color: var(--muted); }
+.wtab:hover { border-color: var(--accent); }
+.wtab[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.wtab[aria-pressed="true"] b { color: var(--accent); }
+
+/* weights */
+details.weights { margin-top: 8px; }
+details.weights summary { cursor: pointer; color: var(--muted); font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; }
+.wgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px 18px; padding: 12px 0 4px; }
+.w { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; align-items: center; min-width: 0; }
+.w label { font-weight: 600; font-size: 14px; }
+.w output { font: 600 15px var(--font-display); color: var(--accent); }
+.w input { grid-column: 1 / -1; width: 100%; accent-color: var(--accent); }
+.w small { grid-column: 1 / -1; color: var(--muted); font-size: 12px; }
+
+/* results */
+.result-bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding-block: 14px 10px; color: var(--muted); font-size: 14px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 12px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px; display: grid; grid-template-columns: 64px 1fr auto; gap: 4px 12px; cursor: pointer; position: relative; min-width: 0; transition: border-color .15s, transform .15s; }
+.card:hover { border-color: var(--accent); }
+.card.listed { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
+.ph { width: 64px; height: 82px; border-radius: 8px; overflow: hidden; background: var(--surface-2); display: grid; place-items: center; font: 700 22px var(--font-display); color: var(--muted); grid-row: span 2; }
+.ph img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.who { min-width: 0; }
+.who .name { font: 700 20px/1.1 var(--font-display); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.who .sub, .who .club { font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.who .sub b { color: var(--fg); font-weight: 600; }
+.score { text-align: center; min-width: 52px; }
+.score b { display: block; font: 700 32px/1 var(--font-display); }
+.score span { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.s-hi { color: var(--good); } .s-mid { color: var(--accent); } .s-lo { color: var(--muted); }
+.tags { grid-column: 2 / -1; display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+.tag { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 6px; background: var(--surface-2); white-space: nowrap; }
+.tag.free { background: color-mix(in srgb, var(--good) 18%, transparent); color: var(--good); }
+.tag.sum { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); }
+.tag.soon { background: color-mix(in srgb, var(--warn) 18%, transparent); color: var(--warn); }
+.tag.loan { background: color-mix(in srgb, var(--bad) 16%, transparent); color: var(--bad); }
+.tag.rt.s-hi { color: var(--good); } .tag.rt.s-mid { color: var(--accent); }
+.tag.list { background: var(--accent); color: var(--accent-ink); }
+.spark { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; margin-top: 6px; }
+.spark div { display: grid; gap: 3px; min-width: 0; }
+.spark i { display: block; height: 5px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
+.spark i::after { content: ""; display: block; height: 100%; width: var(--v); background: var(--c, var(--accent)); }
+.spark small { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.more { display: flex; justify-content: center; padding-block: 18px 40px; }
+.more button { background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 8px; padding: 10px 22px; font-weight: 700; cursor: pointer; }
+.empty { padding: 40px 0; color: var(--muted); text-align: center; }
+
+/* table */
+.tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { padding: 7px 10px; text-align: left; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { font: 600 12px var(--font-body); color: var(--muted); text-transform: uppercase; letter-spacing: .05em; position: sticky; top: 0; background: var(--surface); cursor: pointer; user-select: none; }
+th[data-active] { color: var(--accent); }
+tbody tr { cursor: pointer; }
+tbody tr:hover td { background: var(--surface-2); }
+td.r, th.r { text-align: right; }
+td .mini { width: 30px; height: 38px; border-radius: 4px; overflow: hidden; background: var(--surface-2); display: grid; place-items: center; font: 600 12px var(--font-display); color: var(--muted); }
+td .mini img { width: 100%; height: 100%; object-fit: cover; }
+
+/* sheet */
+.scrim { position: fixed; inset: 0; background: rgba(5,9,30,.55); z-index: 40; }
+.sheet { position: fixed; top: 0; right: 0; bottom: 0; width: min(560px, 100%); background: var(--bg); border-left: 1px solid var(--line); z-index: 50; overflow-y: auto; box-shadow: var(--shadow);
+  padding: calc(env(safe-area-inset-top, 0px) + 18px) max(18px, env(safe-area-inset-right, 0px)) calc(env(safe-area-inset-bottom, 0px) + 24px) 18px; }
+.sheet-head { display: grid; grid-template-columns: 96px 1fr auto; gap: 14px; align-items: start; }
+.sheet-head .ph { width: 96px; height: 124px; grid-row: auto; font-size: 30px; }
+.sheet h2 { font-size: 30px; line-height: 1.05; }
+.close { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; width: 36px; height: 36px; cursor: pointer; font-size: 18px; }
+.facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 16px; margin: 16px 0; }
+.facts div { min-width: 0; }
+.facts dt { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
+.facts dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+.sheet h3 { font-size: 18px; text-transform: uppercase; color: var(--muted); margin: 18px 0 8px; letter-spacing: .04em; }
+.bd { display: grid; gap: 10px; }
+.bd-row { display: grid; grid-template-columns: 1fr auto; gap: 3px 10px; }
+.bd-row b { font-weight: 600; }
+.bd-row output { font: 700 16px var(--font-display); }
+.bd-row .bar { grid-column: 1 / -1; height: 7px; border-radius: 4px; background: var(--surface-2); overflow: hidden; }
+.bd-row .bar i { display: block; height: 100%; width: var(--v); background: var(--c, var(--accent)); }
+.bd-row small { grid-column: 1 / -1; color: var(--muted); font-size: 12.5px; }
+.status { display: flex; flex-wrap: wrap; gap: 6px; }
+.note { width: 100%; min-height: 84px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px; resize: vertical; margin-top: 8px; }
+.note-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 8px; color: var(--muted); font-size: 12.5px; flex-wrap: wrap; }
+.btn { background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 8px; padding: 8px 16px; font-weight: 700; cursor: pointer; }
+.btn:disabled { opacity: .5; cursor: default; }
+.link { color: var(--accent); font-weight: 600; margin-right: 14px; }
+.callout { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font-size: 13.5px; color: var(--muted); }
+footer { color: var(--muted); font-size: 12.5px; padding-block: 24px 40px; border-top: 1px solid var(--line); margin-top: 20px; }
+footer p { max-width: 90ch; margin: 0 0 8px; }
+
+@media (max-width: 760px) {
+  .controls { position: static; }
+}
+@media (max-width: 560px) {
+  .grid { grid-template-columns: 1fr; }
+  .sep { display: none; }
+  .sheet-head { grid-template-columns: 72px 1fr auto; }
+  .sheet-head .ph { width: 72px; height: 94px; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<header class="wrap top">
+  <div class="title-row">
+    <div>
+      <h1>Contract <em>Radar</em></h1>
+      <p class="lede">Players who are free to sign in the next two transfer windows, scored against the seven criteria from <i>From Scout to Agent</i>: what actually stuck in the Israeli Premier League, 20/21–25/26.</p>
+    </div>
+    <div class="stats" id="stats"></div>
+  </div>
+</header>
+
+<section class="controls" aria-label="Filters">
+  <div class="wrap">
+    <div class="wintabs" id="win-tabs" role="group" aria-label="Transfer window"></div>
+    <div class="row">
+      <div class="field search"><label for="q">Search</label><input id="q" type="search" placeholder="Player, club or nationality" autocomplete="off"></div>
+      <div class="field"><label for="sort">Sort</label>
+        <select id="sort">
+          <option value="score">Fit score</option>
+          <option value="end">Contract end (soonest)</option>
+          <option value="mvd">Market value (high → low)</option>
+          <option value="mva">Market value (low → high)</option>
+          <option value="age">Age (youngest)</option>
+          <option value="form">Radar rating (this season)</option>
+          <option value="min">Minutes this season</option>
+          <option value="name">Name</option>
+        </select></div>
+      <div class="field"><label for="lg">League</label><select id="lg"><option value="">All leagues</option></select></div>
+      <div class="toggle" role="group" aria-label="View">
+        <button id="v-cards" aria-pressed="true">Cards</button><button id="v-table" aria-pressed="false">Table</button>
+      </div>
+    </div>
+    <div class="row">
+      <div class="chips" id="pos-chips" role="group" aria-label="Positions"></div>
+      <span class="sep"></span>
+      <div class="chips" id="reg-chips" role="group" aria-label="Regions"></div>
+    </div>
+    <div class="row">
+      <div class="field"><label for="age">Age ≤</label><select id="age"></select></div>
+      <div class="field"><label for="mv">Value ≤</label>
+        <select id="mv">
+          <option value="6000000">€6M</option><option value="3000000">€3M</option><option value="1500000">€1.5M</option>
+          <option value="750000">€750k</option><option value="400000">€400k</option>
+        </select></div>
+      <div class="field"><label for="mins">Minutes 26/27 ≥</label>
+        <select id="mins"><option value="0">Any</option><option value="300">300</option><option value="600">600</option><option value="900">900</option><option value="1200">1,200</option></select></div>
+      <button class="chip-btn" id="only-list" aria-pressed="false">★ Shortlist only</button>
+      <button class="ghost" id="reset">Reset filters</button>
+    </div>
+    <details class="weights" id="wdetails">
+      <summary>Score weights: adjust how much each criterion counts</summary>
+      <div class="wgrid" id="wgrid"></div>
+      <div class="row"><button class="ghost" id="wreset">Restore PDF defaults</button></div>
+    </details>
+  </div>
+</section>
+
+<main class="wrap">
+  <div class="result-bar"><span id="count" class="num">Loading players…</span><span id="sl-state"></span></div>
+  <div id="results"></div>
+  <div class="more" id="more" hidden><button id="more-btn">Show more</button></div>
+</main>
+
+<footer class="wrap">
+  <p><b>Data.</b> Everything is read live from Transfermarkt on <span id="built"></span>: squads, contract end dates, market values and photos from squad pages; this season's games and minutes from club stats pages; agent, caps, contract options and loan players' parent-club contracts from player profiles (fetched for the top-scoring players and loan candidates). Salaries are not public; market value stands in for wage and fee level.</p>
+  <p><b>Score.</b> Hit rates (share of foreign signings still in Israel a season later) are from the PDF. Small samples are pulled toward the regional or overall average so one good season for 7 Senegalese players does not dominate. League Elo and style come from the PDF charts; leagues not on those charts use estimated Elo and a neutral style score.</p>
+</footer>
+
+<div class="scrim" id="scrim" hidden></div>
+<aside class="sheet" id="sheet" hidden aria-modal="true" role="dialog" aria-labelledby="sheet-name"></aside>
+
+<script>
+(() => {
+"use strict";
+const $ = (s, el = document) => el.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const store = {
+  get(k, d) { try { const v = localStorage.getItem("cr:" + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem("cr:" + k, JSON.stringify(v)); } catch {} }
+};
+
+const CRIT = [
+  { k: "position", label: "Position", short: "Pos", src: "PDF: strikers 42%, defenders 41% stayed vs 26% for wingers and midfielders; strikers and centre-backs are also the most signed." },
+  { k: "nationality", label: "Nationality", short: "Nat", src: "PDF: hit rate by country (Senegal 57%, Serbia 45%, Ghana 40% … DR Congo 20%, Guinea 17%)." },
+  { k: "age", label: "Age", short: "Age", src: "PDF: 28+ is the riskiest group (32% stayed vs 45–49% younger)." },
+  { k: "league_strength", label: "League strength", short: "Lvl", src: "PDF Elo chart. Israel = 1449; stronger source leagues score higher." },
+  { k: "contract", label: "Transfer fee", short: "Fee", src: "Everyone listed is free in one of the next two windows. Most foreign signings in the PDF cost no fee." },
+  { k: "value", label: "Salary level", short: "Wage", src: "Market value as a wage/fee proxy. €150k–€1.5M fits Israeli budgets best." },
+  { k: "style", label: "League style", short: "Style", src: "PDF passes/aerials chart: closeness to the Israeli league's style." },
+  { k: "form", label: "Radar rating", short: "Radar", src: "Not from the PDF. Our 0–10 season rating from live stats, about the player only: minutes, starts, goals/assists for his position, team points with vs without him, cards. Off (0) by default." },
+];
+const POS_ORDER = ["GK", "RB", "CB", "LB", "DM", "CM", "AM", "W", "ST"];
+const REGIONS = ["Israel", "Africa", "Europe", "Americas", "Other"];
+const PAGE = 60;
+
+let META, PLAYERS = [], defaults = {}, weights = {};
+let state = {}, shown = PAGE, current = null;
+const imgPacks = {}, imgLoading = {};
+const shortlist = new Map();
+let db = null, userCap = null, canWrite = false, slMode = "local";
+
+const DEFAULT_STATE = () => ({ q: "", sort: "score", win: "", lg: "", pos: [], reg: [], age: 40, mv: 6000000, mins: 0, onlyList: false, view: "cards" });
+
+// ---------- formatting
+const fmtMoney = v => v == null ? "–" : v >= 1e6 ? "€" + String(Number((v / 1e6).toFixed(2))) + "M" : "€" + Math.round(v / 1e3) + "k";
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const fmtDate = s => { if (!s) return "–"; const [y, m, d] = s.split("-").map(Number); return `${d} ${MONTHS[m - 1]} ${y}`; };
+const fmtMonth = s => { const [y, m] = s.split("-").map(Number); return `${MONTHS[m - 1]} ${y}`; };
+const initials = n => n.split(/\s+/).filter(Boolean).map(w => w[0]).slice(0, 2).join("").toUpperCase();
+const rtClass = r => r >= 7.0 ? "s-hi" : r >= 6.6 ? "s-mid" : "s-lo";
+const sClass = s => s >= 72 ? "s-hi" : s >= 58 ? "s-mid" : "s-lo";
+const barColor = v => v >= 70 ? "var(--good)" : v >= 45 ? "var(--accent)" : "var(--bad)";
+
+const WIN = {};  // key -> window {label, closes, arrival}
+function contractInfo(p) {
+  const w = WIN[p.w], first = META.windows[0].key === p.w;
+  const short = w.label.replace("January", "Jan");
+  const pre = (() => { const d = new Date(p.end); d.setMonth(d.getMonth() - 6); return d; })();
+  const preTxt = pre > new Date() ? ` He can agree a pre-contract with a new club from ${pre.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })} (last 6 months, FIFA rule).` : " He is already in his last 6 months, so he can agree a pre-contract with a new club now (FIFA rule).";
+  return {
+    cls: first ? "free" : "sum",
+    text: `Free · ${short}`,
+    long: `Contract ends ${fmtDate(p.end)}: free to sign in the ${w.label} window (closes ${fmtDate(w.closes)}), no transfer fee.` + (first ? "" : preTxt),
+  };
+}
+
+// ---------- scoring
+function score(p) {
+  let tot = 0, wsum = 0;
+  for (const c of CRIT) { const w = weights[c.k] || 0; const v = p.c[c.k] ?? 50; tot += w * v; wsum += w; }
+  return wsum ? Math.round(tot / wsum) : 0;
+}
+
+// ---------- images (packed per league, loaded on demand)
+function loadPack(lg) {
+  if (DIRECT_IMG || imgPacks[lg] || imgLoading[lg]) return;
+  imgLoading[lg] = fetch("img/" + lg + ".json").then(r => r.ok ? r.json() : {}).catch(() => ({})).then(m => {
+    imgPacks[lg] = m;
+    document.querySelectorAll(`[data-img-lg="${lg}"]`).forEach(el => paintImg(el));
+  });
+}
+function photoHTML(p, cls = "ph") {
+  return `<div class="${cls}" data-img-lg="${esc(p.lg)}" data-pid="${p.id}" data-ini="${esc(initials(p.name))}">${imgFor(p) ? `<img alt="" loading="lazy" src="${esc(imgFor(p))}" onerror="this.parentNode.textContent=this.parentNode.dataset.ini">` : esc(initials(p.name))}</div>`;
+}
+const DIRECT_IMG = !window.claude; // off claude.ai (e.g. GitHub Pages) photos load straight from Transfermarkt
+function imgFor(p) {
+  if (DIRECT_IMG) return p.img ? p.img.replace("/portrait/header/", "/portrait/medium/") : null;
+  const pk = imgPacks[p.lg]; return pk && pk[p.id];
+}
+function paintImg(el) {
+  const pk = imgPacks[el.dataset.imgLg]; const src = pk && pk[el.dataset.pid];
+  if (src && !el.querySelector("img")) el.innerHTML = `<img alt="" src="${src}">`;
+}
+
+// ---------- filtering
+function filtered() {
+  const q = state.q.trim().toLowerCase();
+  const pos = new Set(state.pos), reg = new Set(state.reg);
+  const out = [];
+  for (const p of PLAYERS) {
+    if (state.win && p.w !== state.win) continue;
+    if (state.lg && p.lg !== state.lg) continue;
+    if (pos.size && !pos.has(p.pg)) continue;
+    if (reg.size && !reg.has(p.reg)) continue;
+    if (p.ageA != null && p.ageA > state.age) continue;
+    if (p.mv != null && p.mv > state.mv) continue;
+    if (state.mins > 0 && (!p.st || p.st.min < state.mins)) continue;
+    if (state.onlyList && !shortlist.has(String(p.id))) continue;
+    if (q && !p._q.includes(q)) continue;
+    out.push(p);
+  }
+  const by = {
+    score: (a, b) => b._s - a._s || a.end.localeCompare(b.end),
+    end: (a, b) => a.end.localeCompare(b.end) || b._s - a._s,
+    mvd: (a, b) => (b.mv ?? -1) - (a.mv ?? -1),
+    mva: (a, b) => (a.mv ?? 1e12) - (b.mv ?? 1e12),
+    age: (a, b) => (a.ageA ?? 99) - (b.ageA ?? 99) || b._s - a._s,
+    min: (a, b) => (b.st?.min ?? -1) - (a.st?.min ?? -1),
+    form: (a, b) => (b.rt ?? -1) - (a.rt ?? -1) || b._s - a._s,
+    name: (a, b) => a.name.localeCompare(b.name),
+  }[state.sort];
+  return out.sort(by);
+}
+
+// ---------- rendering
+function cardHTML(p) {
+  const ci = contractInfo(p), sl = shortlist.get(String(p.id));
+  const lgName = META.leagues[p.lg]?.name || p.lg;
+  const mins = p.st ? `${p.st.min.toLocaleString("en-US")}′ 26/27` : "";
+  const spark = CRIT.map(c => { const v = p.c[c.k]; return `<div title="${esc(c.label)}: ${v ?? "n/a"}"><i style="--v:${v ?? 50}%;--c:${v == null ? "var(--line)" : barColor(v)}"></i><small>${c.short}</small></div>`; }).join("");
+  return `<article class="card${sl ? " listed" : ""}" data-id="${p.id}" tabindex="0" aria-label="${esc(p.name)}, fit score ${p._s}">
+    ${photoHTML(p)}
+    <div class="who">
+      <div class="name">${esc(p.name)}</div>
+      <div class="sub"><b>${esc(p.pos)}</b> · ${p.ageA ?? "?"} next summer · ${esc(p.nats.join(" / "))}</div>
+      <div class="club">${esc(p.club)} · ${esc(lgName)}</div>
+    </div>
+    <div class="score"><b class="num ${sClass(p._s)}">${p._s}</b><span>fit</span></div>
+    <div class="tags">
+      <span class="tag ${ci.cls}">${ci.text}</span>
+      <span class="tag num">${fmtMoney(p.mv)}</span>
+      ${p.rt != null ? `<span class="tag num rt ${rtClass(p.rt)}" title="Radar rating this season (0–10, like Sofascore)">Radar ${p.rt.toFixed(1)}</span>` : ""}
+      ${mins ? `<span class="tag num">${mins}</span>` : ""}
+      ${p.loan ? `<span class="tag loan">On loan</span>` : ""}
+      ${p.opt ? `<span class="tag soon" title="${esc(p.opt)}">Club option</span>` : ""}
+      ${sl ? `<span class="tag list">★ ${esc(statusLabel(sl.status))}</span>` : ""}
+    </div>
+    <div class="spark">${spark}</div>
+  </article>`;
+}
+function tableHTML(list) {
+  const cols = [["", null], ["Player", "name"], ["Pos", null], ["Age", "age"], ["Nationality", null], ["Club", null], ["League", null], ["Contract", "end"], ["Value", "mvd", "r"], ["Min 26/27", "min", "r"], ["Radar", "form", "r"], ["Fit", "score", "r"]];
+  const head = cols.map(([t, k, r]) => `<th class="${r || ""}" ${k ? `data-sort="${k}"` : ""} ${k === state.sort ? "data-active" : ""}>${t}</th>`).join("");
+  const rows = list.map(p => {
+    const sl = shortlist.get(String(p.id));
+    return `<tr data-id="${p.id}"><td>${photoHTML(p, "mini")}</td><td><b>${sl ? "★ " : ""}${esc(p.name)}</b></td><td>${esc(p.pg)}</td><td class="num">${p.ageA ?? "?"}</td><td>${esc(p.nats.join(" / "))}</td><td>${esc(p.club)}</td><td>${esc(META.leagues[p.lg]?.name || p.lg)}</td><td class="num">${fmtMonth(p.end)}${p.loan ? " (loan)" : ""}</td><td class="r num">${fmtMoney(p.mv)}</td><td class="r num">${p.st ? p.st.min.toLocaleString("en-US") : "–"}</td><td class="r num">${p.rt != null ? `<b class="${rtClass(p.rt)}">${p.rt.toFixed(1)}</b>` : "–"}</td><td class="r num"><b class="${sClass(p._s)}">${p._s}</b></td></tr>`;
+  }).join("");
+  return `<div class="tablewrap"><table><thead><tr>${head}</tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+
+function render() {
+  for (const p of PLAYERS) p._s = score(p);
+  const list = filtered();
+  const page = list.slice(0, shown);
+  let countTxt = list.length ? `${list.length.toLocaleString("en-US")} players match · showing ${page.length.toLocaleString("en-US")}` : "";
+  if (state.sort === "form" && list.length) {
+    const rated = list.filter(p => p.rt != null).length;
+    countTxt += rated
+      ? ` · Radar: ${rated.toLocaleString("en-US")} rated (best first), ${(list.length - rated).toLocaleString("en-US")} without a rating listed after them by fit score`
+      : " · Radar: none of these players has a rating yet (under 270 minutes this season, or their league's stats aren't loaded yet), so they're listed by fit score";
+  }
+  $("#count").textContent = countTxt;
+  const res = $("#results");
+  if (!list.length) {
+    res.innerHTML = `<div class="empty">No players match these filters. Try a wider contract window, a higher value cap or fewer position chips.</div>`;
+  } else {
+    res.innerHTML = state.view === "table" ? tableHTML(page) : `<div class="grid">${page.map(cardHTML).join("")}</div>`;
+  }
+  $("#more").hidden = list.length <= shown;
+  $("#more-btn").textContent = `Show ${Math.min(PAGE, list.length - shown)} more`;
+  new Set(page.map(p => p.lg)).forEach(loadPack);
+  store.set("state", state);
+}
+
+function renderStats() {
+  const lgCount = new Set(PLAYERS.map(p => p.lg)).size;
+  $("#stats").innerHTML = [
+    ...META.windows.map(w => [PLAYERS.filter(p => p.w === w.key).length.toLocaleString("en-US"), `free in ${w.label.replace("January", "Jan")} window`]),
+    [lgCount, "leagues scanned"],
+  ].map(([b, s]) => `<div class="stat"><b class="num">${b}</b><span>${s}</span></div>`).join("");
+  $("#built").textContent = fmtDate(META.built);
+}
+
+// ---------- controls
+function buildControls() {
+  const lgSel = $("#lg");
+  const used = [...new Set(PLAYERS.map(p => p.lg))].sort((a, b) => META.leagues[a].country.localeCompare(META.leagues[b].country) || META.leagues[b].elo - META.leagues[a].elo);
+  const nWin = k => PLAYERS.filter(p => !k || p.w === k).length.toLocaleString("en-US");
+  $("#win-tabs").innerHTML = `<button class="wtab" data-win="" aria-pressed="true"><b>All windows</b><span>${nWin("")} players</span></button>` +
+    META.windows.map((w, i) => `<button class="wtab${i === 0 ? " now" : ""}" data-win="${w.key}" aria-pressed="false"><b>${esc(w.label)}${i === 0 ? " · next" : ""}</b><span>${nWin(w.key)} free · closes ${fmtDate(w.closes)}</span></button>`).join("");
+  $("#win-tabs").addEventListener("click", e => { const b = e.target.closest("[data-win]"); if (!b) return; state.win = b.dataset.win; syncControls(); shown = PAGE; render(); });
+  lgSel.innerHTML = `<option value="">All leagues</option>` + used.map(k => `<option value="${k}">${esc(META.leagues[k].country)} · ${esc(META.leagues[k].name)}</option>`).join("");
+  $("#pos-chips").innerHTML = POS_ORDER.map(k => `<button class="chip-btn" data-pos="${k}" aria-pressed="false" title="${esc(META.positions[k])}">${k}</button>`).join("");
+  $("#reg-chips").innerHTML = REGIONS.map(k => `<button class="chip-btn" data-reg="${k}" aria-pressed="false">${k}</button>`).join("");
+  $("#age").innerHTML = [40, 33, 31, 29, 27, 25, 23].map(a => `<option value="${a}">${a === 40 ? "Any" : a}</option>`).join("");
+  $("#wgrid").innerHTML = CRIT.map(c => `<div class="w"><label for="w-${c.k}">${c.label}</label><output id="wo-${c.k}"></output><input type="range" id="w-${c.k}" min="0" max="40" step="1" data-w="${c.k}"><small>${esc(c.src)}</small></div>`).join("");
+
+  const bindSel = (id, key, num) => $(id).addEventListener("change", e => { state[key] = num ? Number(e.target.value) : e.target.value; shown = PAGE; render(); });
+  bindSel("#sort", "sort"); bindSel("#lg", "lg"); bindSel("#age", "age", 1); bindSel("#mv", "mv", 1); bindSel("#mins", "mins", 1);
+  let t; $("#q").addEventListener("input", e => { clearTimeout(t); t = setTimeout(() => { state.q = e.target.value; shown = PAGE; render(); }, 150); });
+  $("#pos-chips").addEventListener("click", e => toggleArr(e, "pos"));
+  $("#reg-chips").addEventListener("click", e => toggleArr(e, "reg"));
+  $("#only-list").addEventListener("click", () => { state.onlyList = !state.onlyList; syncControls(); shown = PAGE; render(); });
+  $("#reset").addEventListener("click", () => { const v = state.view; state = DEFAULT_STATE(); state.view = v; syncControls(); shown = PAGE; render(); });
+  $("#v-cards").addEventListener("click", () => { state.view = "cards"; syncControls(); render(); });
+  $("#v-table").addEventListener("click", () => { state.view = "table"; syncControls(); render(); });
+  $("#wgrid").addEventListener("input", e => { const k = e.target.dataset.w; if (!k) return; weights[k] = Number(e.target.value); $("#wo-" + k).textContent = weights[k]; store.set("weights", weights); render(); if (current) openSheet(current); });
+  $("#wreset").addEventListener("click", () => { weights = { ...defaults }; store.set("weights", weights); syncWeights(); render(); });
+  $("#more-btn").addEventListener("click", () => { shown += PAGE; render(); });
+  $("#results").addEventListener("click", e => {
+    const th = e.target.closest("th[data-sort]");
+    if (th) { state.sort = th.dataset.sort; syncControls(); render(); return; }
+    const el = e.target.closest("[data-id]"); if (el) openSheet(Number(el.dataset.id));
+  });
+  $("#results").addEventListener("keydown", e => { if (e.key === "Enter") { const el = e.target.closest("[data-id]"); if (el) openSheet(Number(el.dataset.id)); } });
+  $("#scrim").addEventListener("click", closeSheet);
+  document.addEventListener("keydown", e => { if (e.key === "Escape" && current) closeSheet(); });
+}
+function toggleArr(e, key) {
+  const b = e.target.closest("button"); if (!b) return;
+  const v = b.dataset[key]; const s = new Set(state[key]);
+  s.has(v) ? s.delete(v) : s.add(v); state[key] = [...s]; syncControls(); shown = PAGE; render();
+}
+function syncControls() {
+  $("#q").value = state.q; $("#sort").value = state.sort; document.querySelectorAll("[data-win]").forEach(b => b.setAttribute("aria-pressed", b.dataset.win === state.win)); $("#lg").value = state.lg;
+  $("#age").value = String(state.age); $("#mv").value = String(state.mv); $("#mins").value = String(state.mins);
+  document.querySelectorAll("[data-pos]").forEach(b => b.setAttribute("aria-pressed", state.pos.includes(b.dataset.pos)));
+  document.querySelectorAll("[data-reg]").forEach(b => b.setAttribute("aria-pressed", state.reg.includes(b.dataset.reg)));
+  $("#only-list").setAttribute("aria-pressed", state.onlyList);
+  $("#v-cards").setAttribute("aria-pressed", state.view === "cards"); $("#v-table").setAttribute("aria-pressed", state.view === "table");
+}
+function syncWeights() { for (const c of CRIT) { $("#w-" + c.k).value = weights[c.k]; $("#wo-" + c.k).textContent = weights[c.k]; } }
+
+// ---------- player sheet
+function explain(p, k) {
+  const L = META.leagues[p.lg];
+  switch (k) {
+    case "position": return p.why.position;
+    case "nationality": return p.why.nationality + (p.nats.length > 1 && p.reg !== "Israel" ? ` (counted as ${p.cty}, as in the PDF)` : "");
+    case "age": return `${p.ageA ?? "?"} years old when the ${WIN[p.w].label} window opens. PDF: up to 23 → 49%, 24–27 → 45%, 28+ → 32% stayed.`;
+    case "league_strength": return `${L.name} Elo ${L.elo}${L.eloSrc === "pdf" ? " (PDF chart)" : " (estimate, not on the PDF chart)"} vs Israel 1449.`;
+    case "contract": return contractInfo(p).long;
+    case "value": return `Market value ${fmtMoney(p.mv)}. Used as a stand-in for wage and fee level.`;
+    case "form": {
+      if (p.rt == null) return "Not enough minutes this season to rate (needs 270+).";
+      const L = { play: "playing time", starts: "starts", output: "goals+assists for position", impact: "team points with vs without him", discipline: "cards" };
+      const parts = Object.entries(p.rp || {}).filter(([, v]) => Math.abs(v) >= 0.01).map(([k, v]) => `${L[k] || k} ${v > 0 ? "+" : ""}${v.toFixed(2)}`).join(", ");
+      return `Radar ${p.rt.toFixed(2)} = 6.75 base ${parts ? "· " + parts : ""}. ${p.rs === 2 ? "Based on this season + last season (half weight)." : "Based on this season only."} Scale like Sofascore: 6.0–6.9 average, 7.0+ good.`;
+    }
+    case "style": return p.c.style == null ? `${L.name} is not on the PDF style chart, so this counts as neutral (50).` : `${L.name} plays ${p.c.style >= 70 ? "close to" : p.c.style >= 40 ? "somewhat like" : "unlike"} the Israeli league (passes and aerial duels per game).`;
+  }
+}
+function statusLabel(s) { return { watch: "Watching", contact: "Contacting", pass: "Passed" }[s] || "Shortlisted"; }
+
+function openSheet(id) {
+  const p = PLAYERS.find(x => x.id === id); if (!p) return;
+  current = id; loadPack(p.lg);
+  const L = META.leagues[p.lg], sl = shortlist.get(String(id)), ci = contractInfo(p);
+  const st = p.st ? `${p.st.g} games (${p.st.g - (p.st.on || 0)} starts) · ${p.st.min.toLocaleString("en-US")} min · ${p.st.gl} goals · ${p.st.as} assists` + (p.st.ppg != null ? ` · team ${p.st.ppg.toFixed(2)} pts/game with him${p.tppg != null ? " vs " + p.tppg.toFixed(2) + " average" : ""}` : "") + (p.st.yc || p.st.rc ? ` · ${p.st.yc} yellow${p.st.rc ? ", " + p.st.rc + " red" : ""}` : "") : "No appearances recorded yet";
+  const bd = CRIT.map(c => { const v = p.c[c.k]; return `<div class="bd-row"><b>${c.label} <span style="color:var(--muted);font-weight:400">· weight ${weights[c.k]}</span></b><output class="num">${v ?? "n/a"}</output><div class="bar"><i style="--v:${v ?? 50}%;--c:${v == null ? "var(--line)" : barColor(v)}"></i></div><small>${esc(explain(p, c.k))}</small></div>`; }).join("");
+  const statusBtns = ["watch", "contact", "pass"].map(s => `<button class="chip-btn" data-status="${s}" aria-pressed="${sl?.status === s}" ${slMode === "readonly" ? "disabled" : ""}>${statusLabel(s)}</button>`).join("") + (sl && slMode !== "readonly" ? `<button class="ghost" data-status="">Remove</button>` : "");
+  const tm = `https://www.transfermarkt.com/${encodeURIComponent(p.slug)}/profil/spieler/${p.id}`;
+  $("#sheet").innerHTML = `
+    <div class="sheet-head">${photoHTML(p)}<div style="min-width:0"><h2 id="sheet-name">${esc(p.name)}</h2>
+      <div style="color:var(--muted)">${esc(p.pos)} · ${esc(p.club)}</div>
+      <div class="tags" style="margin-top:8px"><span class="tag ${ci.cls}">${ci.text}</span><span class="tag">${fmtMoney(p.mv)}</span></div></div>
+      <div style="text-align:center"><button class="close" id="close" aria-label="Close">✕</button><div class="score" style="margin-top:10px"><b class="num ${sClass(p._s)}">${p._s}</b><span>fit</span></div></div></div>
+    <dl class="facts">
+      <div><dt>Born</dt><dd>${fmtDate(p.dob)} (${p.age ?? "?"})</dd></div>
+      <div><dt>Nationality</dt><dd>${esc(p.nats.join(" / ") || "–")}</dd></div>
+      <div><dt>League</dt><dd>${esc(L.name)}, ${esc(L.country)}</dd></div>
+      <div><dt>Contract ends</dt><dd>${fmtDate(p.end)}</dd></div>
+      <div><dt>Height / foot</dt><dd>${p.h ? (p.h / 100).toFixed(2) + " m" : "–"} / ${esc(p.foot || "–")}</dd></div>
+      <div><dt>Joined</dt><dd>${fmtDate(p.joined)}${p.from ? " from " + esc(p.from) : ""}</dd></div>
+      <div><dt>Agent</dt><dd>${p.prof ? esc(p.agent || "None listed") : "Not checked yet: see profile"}</dd></div>
+      <div><dt>Radar rating</dt><dd>${p.rt != null ? `<b class="${rtClass(p.rt)}">${p.rt.toFixed(2)}</b> / 10` : "Not enough minutes"}</dd></div>
+      <div><dt>International caps</dt><dd>${p.prof ? (p.caps ?? 0) : "Not checked yet"}</dd></div>
+      ${p.opt ? `<div style="grid-column:1/-1"><dt>Contract option</dt><dd>${esc(p.opt)}: the club may be able to extend, so he may not be free</dd></div>` : ""}
+      <div style="grid-column:1/-1"><dt>This season (all competitions)</dt><dd>${esc(st)}</dd></div>
+      <div style="grid-column:1/-1"><dt>Last season, same club</dt><dd>${p.stp ? `${p.stp.g} games · ${p.stp.min.toLocaleString("en-US")} min · ${p.stp.gl} goals · ${p.stp.as} assists` : "Not at this club last season (Radar uses this season only)"}</dd></div>
+      ${p.loan ? `<div style="grid-column:1/-1"><dt>Loan</dt><dd>${esc(p.loan)}</dd></div>` : ""}
+    </dl>
+    <div class="row">
+      <a class="link" href="${tm}" target="_blank" rel="noopener">Transfermarkt ↗</a>
+      <a class="link" href="https://www.google.com/search?q=${encodeURIComponent(p.name + " " + p.club + " sofascore")}" target="_blank" rel="noopener">Ratings on Sofascore ↗</a>
+      <a class="link" href="https://www.google.com/search?q=${encodeURIComponent(p.name + " " + p.club + " 365scores")}" target="_blank" rel="noopener">on 365Scores ↗</a>
+    </div>
+    <h3>Shortlist</h3>
+    <div class="status" id="status">${statusBtns}</div>
+    <textarea class="note" id="note" placeholder="Notes for both of you: contact, wage ask, clubs interested…" ${slMode === "readonly" ? "disabled" : ""}>${esc(sl?.note || "")}</textarea>
+    <div class="note-row"><span id="note-meta">${slMeta(sl)}</span><button class="btn" id="save-note" ${slMode === "readonly" ? "disabled" : ""}>Save note</button></div>
+    <h3>Why ${p._s}?</h3>
+    <div class="bd">${bd}</div>`;
+  $("#sheet").hidden = false; $("#scrim").hidden = false;
+  $("#close").addEventListener("click", closeSheet);
+  $("#close").focus({ preventScroll: true });
+  $("#status").addEventListener("click", e => { const b = e.target.closest("[data-status]"); if (b && !b.disabled) saveShort(p.id, b.dataset.status, $("#note").value); });
+  $("#save-note").addEventListener("click", () => saveShort(p.id, sl?.status || shortlist.get(String(p.id))?.status || "watch", $("#note").value));
+  fillNames();
+}
+function closeSheet() { current = null; $("#sheet").hidden = true; $("#scrim").hidden = true; }
+function slMeta(sl) {
+  if (slMode === "readonly") return "View only: you can read the shortlist but not change it.";
+  if (!sl) return slMode === "shared" ? "Saved for everyone who opens this page." : "Saved in this browser only.";
+  const when = sl.at ? new Date(sl.at).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : "";
+  return `Updated ${when}${sl.by ? ` by <span data-uid="${esc(sl.by)}">someone</span>` : ""}`;
+}
+async function fillNames() {
+  if (!userCap) return;
+  const els = [...document.querySelectorAll("[data-uid]")]; if (!els.length) return;
+  try { const ps = await userCap.profiles([...new Set(els.map(e => e.dataset.uid))]); els.forEach(e => { e.textContent = ps?.[e.dataset.uid]?.name || "someone"; }); } catch {}
+}
+
+// ---------- shortlist (shared through the artifact db when available, else this browser)
+let myId = null;
+async function saveShort(id, status, note) {
+  const key = String(id);
+  const body = { status: status || "watch", note: (note || "").slice(0, 4000), at: new Date().toISOString(), by: myId || "" };
+  if (slMode === "readonly") return;
+  try {
+    if (slMode === "shared") {
+      const ref = db.collection("shortlist").doc(key);
+      if (status === "") await ref.delete(); else await ref.set(body);
+    } else {
+      if (status === "") shortlist.delete(key); else shortlist.set(key, body);
+      store.set("shortlist", Object.fromEntries(shortlist));
+      afterShortlistChange();
+    }
+  } catch (e) {
+    if (e && e.code === "invalid_argument" && slMode === "shared") { slMode = "readonly"; setSlState(); }
+    const m = $("#note-meta"); if (m) m.textContent = "Couldn't save: " + (e?.message || "try again in a moment");
+  }
+}
+function afterShortlistChange() {
+  render();
+  const typing = document.activeElement && document.activeElement.id === "note";
+  if (current && !typing) openSheet(current);
+}
+function setSlState() {
+  const n = shortlist.size;
+  $("#sl-state").textContent = { shared: `★ ${n} on the shared shortlist`, local: `★ ${n} shortlisted (this browser)`, readonly: `★ ${n} on the shortlist (view only)` }[slMode];
+}
+async function initShortlist() {
+  const local = store.get("shortlist", {});
+  Object.entries(local).forEach(([k, v]) => shortlist.set(k, v));
+  setSlState();
+  if (!window.claude?.use) return;
+  try { db = await window.claude.use("db"); } catch { db = null; }
+  try { userCap = await window.claude.use("user"); } catch { userCap = null; }
+  if (!db) return;
+  try { myId = await userCap?.id?.(); } catch {}
+  try { const c = await userCap?.can?.("data.write"); canWrite = c !== false; } catch { canWrite = true; }
+  slMode = canWrite ? "shared" : "readonly";
+  shortlist.clear(); setSlState();
+  const timer = setTimeout(() => { $("#sl-state").textContent = "Shared shortlist can't be reached yet…"; }, 10000);
+  db.collection("shortlist").onSnapshot(snap => {
+    if (!snap.metadata.fromCache) clearTimeout(timer);
+    shortlist.clear(); snap.docs.forEach(d => shortlist.set(d.id, d.data()));
+    setSlState(); afterShortlistChange();
+  }, err => { clearTimeout(timer); $("#sl-state").textContent = "Shared shortlist unavailable right now."; });
+}
+
+// ---------- boot
+async function boot() {
+  let data;
+  try { data = await (await fetch("players.json", { cache: "no-cache" })).json(); }
+  catch { $("#count").textContent = "Couldn't load players.json. If you opened this file directly, run ./serve.sh and open the address it prints."; return; }
+  META = data.meta; PLAYERS = data.players;
+  for (const p of PLAYERS) p._q = [p.name, p.club, p.nats.join(" "), p.pos, META.leagues[p.lg]?.name, p.agent].join(" ").toLowerCase();
+  META.windows.forEach(w => { WIN[w.key] = w; });
+  defaults = { ...META.weights };
+  for (const c of CRIT) if (defaults[c.k] == null) defaults[c.k] = 0;
+  weights = { ...defaults, ...store.get("weights", {}) };
+  state = { ...DEFAULT_STATE(), ...store.get("state", {}) };
+  if (state.win && !WIN[state.win]) state.win = "";  // a window that has closed since last visit
+  buildControls(); syncControls(); syncWeights(); renderStats(); render();
+  initShortlist();
+}
+boot();
+})();
+</script>
+</body></html>
